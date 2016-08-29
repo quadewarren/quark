@@ -183,6 +183,7 @@ class TestQuarkCreateSubnetOverlapping(test_quark_plugin.TestQuarkPlugin):
         network.update(dict(id=1, subnets=subnet_models))
         with mock.patch("quark.db.api.network_find") as net_find, \
                 mock.patch("quark.db.api.subnet_find") as subnet_find, \
+                mock.patch("quark.db.api.network_find") as network_find, \
                 mock.patch("quark.db.api.subnet_create") as subnet_create, \
                 mock.patch("neutron.common.rpc.get_notifier"):
             net_find.return_value = network
@@ -190,6 +191,7 @@ class TestQuarkCreateSubnetOverlapping(test_quark_plugin.TestQuarkPlugin):
             subnet_create.return_value = models.Subnet(
                 network=models.Network(),
                 cidr="192.168.1.1/24")
+            network_find.return_value = dict(id=1, ipam_strategy="ANY")
             yield subnet_create
 
     def test_create_subnet_overlapping_true(self):
@@ -226,7 +228,8 @@ class TestQuarkCreateSubnetOverlapping(test_quark_plugin.TestQuarkPlugin):
 class TestQuarkCreateSubnetAllocationPools(test_quark_plugin.TestQuarkPlugin):
     @contextlib.contextmanager
     def _stubs(self, subnet):
-        s = models.Subnet(network=models.Network(id=1, subnets=[]))
+        s = models.Subnet(network=models.Network(id=1, subnets=[],
+                                                 ipam_strategy="ANY"))
         allocation_pools = subnet.pop("allocation_pools", None)
         s.update(subnet)
         if allocation_pools is not None:
@@ -409,7 +412,7 @@ class TestQuarkCreateSubnet(test_quark_plugin.TestQuarkPlugin):
                            "UOWTransaction.register_object") as \
                 register_object:
             subnet_create.return_value = subnet_mod
-            net_find.return_value = network
+            net_find.return_value = dict(id=1, ipam_strategy="ANY")
             route_create.side_effect = route_models
             dns_create.side_effect = dns_models
             alloc_pools_method.__get__ = mock.Mock(
@@ -528,8 +531,10 @@ class TestQuarkCreateSubnet(test_quark_plugin.TestQuarkPlugin):
     def test_create_subnet_no_network_fails(self):
         subnet = dict(subnet=dict(network_id=1))
         with self._stubs(subnet=dict(), network=False):
-            with self.assertRaises(n_exc.NetworkNotFound):
-                self.plugin.create_subnet(self.context, subnet)
+            with mock.patch("quark.db.api.network_find") as net_find:
+                net_find.return_value = None
+                with self.assertRaises(n_exc.NetworkNotFound):
+                    self.plugin.create_subnet(self.context, subnet)
 
     def test_create_subnet_no_gateway_ip_defaults(self):
         subnet = dict(
@@ -1279,7 +1284,7 @@ class TestSubnetsQuotas(test_quark_plugin.TestQuarkPlugin):
         with mock.patch("quark.plugin_modules.subnets.get_subnets") as \
                 get_subnets, \
                 mock.patch("quark.db.api.subnet_find") as sub_find, \
-                mock.patch("quark.db.api.network_find"), \
+                mock.patch("quark.db.api.network_find") as network_find, \
                 mock.patch("quark.db.api.subnet_create") as sub_create, \
                 mock.patch("quark.db.api.subnet_delete"), \
                 mock.patch("neutron.common.rpc.get_notifier") as notify, \
@@ -1293,6 +1298,7 @@ class TestSubnetsQuotas(test_quark_plugin.TestQuarkPlugin):
                 retsubs = subnets[1:]
             get_subnets.return_value = retsubs
             time_func.return_value = deleted_at
+            network_find.return_value = dict(id=1, ipam_strategy="ANY")
             yield notify
 
     def test_create_subnet_v4_alongside_v6_quota_pass(self):
@@ -1469,6 +1475,7 @@ class TestQuarkCreateSubnetAttrFilters(test_quark_plugin.TestQuarkPlugin):
                 mock.patch("neutron.common.rpc.get_notifier"), \
                 mock.patch("sqlalchemy.orm.session.SessionTransaction.commit"):
             route_create.return_value = models.Route()
+            net_find.return_value = dict(id=1, ipam_strategy="ANY")
             yield subnet_create, net_find
 
     def test_create_subnet(self):
@@ -1489,7 +1496,8 @@ class TestQuarkCreateSubnetAttrFilters(test_quark_plugin.TestQuarkPlugin):
             subnet_create.assert_called_once_with(
                 self.context, network_id=subnet["subnet"]["network_id"],
                 tenant_id=subnet["subnet"]["tenant_id"],
-                cidr=subnet["subnet"]["cidr"], network=net_find())
+                cidr=subnet["subnet"]["cidr"], network=net_find(),
+                subnet_strategy=net_find["ipam_strategy"])
 
     def test_create_subnet_admin(self):
         subnet = {"subnet": {
@@ -1511,7 +1519,8 @@ class TestQuarkCreateSubnetAttrFilters(test_quark_plugin.TestQuarkPlugin):
                 admin_ctx, network_id=subnet["subnet"]["network_id"],
                 tenant_id=subnet["subnet"]["tenant_id"],
                 cidr=subnet["subnet"]["cidr"], network=net_find(),
-                next_auto_assign_ip=subnet["subnet"]["next_auto_assign_ip"])
+                next_auto_assign_ip=subnet["subnet"]["next_auto_assign_ip"],
+                subnet_strategy=net_find["ipam_strategy"])
 
 
 class TestQuarkUpdateSubnetAttrFilters(test_quark_plugin.TestQuarkPlugin):

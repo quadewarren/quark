@@ -489,6 +489,7 @@ class QuarkIpamTestBothIpAllocation(QuarkIpamBaseTest):
                 mock.patch("quark.db.api.ip_address_reallocate_find") as \
                 addr_realloc_find, \
                 mock.patch("quark.db.api.ip_address_find") as addr_find, \
+                mock.patch("quark.db.api.network_find") as network_find, \
                 mock.patch("quark.db.api.subnet_find_ordered_by_most_full") \
                 as subnet_alloc_find, \
                 mock.patch("quark.db.api.subnet_find") as subnet_find, \
@@ -523,6 +524,7 @@ class QuarkIpamTestBothIpAllocation(QuarkIpamBaseTest):
                 subnet_find.return_value = [sub_mods[0][0][0]]
             subnet_alloc_find.side_effect = sub_mods
             subnet_update.return_value = 1
+            network_find.return_value = dict(id=0, ipam_strategy="ANY")
 
             def refresh_mock(sub):
                 if sub["next_auto_assign_ip"] >= 0:
@@ -900,6 +902,7 @@ class QuarkIpamTestBothRequiredIpAllocation(QuarkIpamBaseTest):
                 mock.patch("quark.db.api.ip_address_reallocate_find") as \
                 addr_realloc_find, \
                 mock.patch("quark.db.api.ip_address_find") as addr_find, \
+                mock.patch("quark.db.api.network_find") as network_find, \
                 mock.patch("quark.db.api.subnet_find_ordered_by_most_full") \
                 as subnet_find, \
                 mock.patch("quark.db.api.subnet_update_next_auto_assign_ip") \
@@ -928,6 +931,7 @@ class QuarkIpamTestBothRequiredIpAllocation(QuarkIpamBaseTest):
                 sub_mods.append(sub_mod_list)
             subnet_find.side_effect = sub_mods
             subnet_update.return_value = 1
+            network_find.return_value = dict(id=0, ipam_strategy="ANY")
 
             def refresh_mock(sub):
                 if sub["next_auto_assign_ip"] != -1:
@@ -1212,6 +1216,7 @@ class QuarkNewIPAddressAllocation(QuarkIpamBaseTest):
                 mock.patch("quark.db.api.ip_address_reallocate_find") as \
                 addr_realloc_find, \
                 mock.patch("quark.db.api.ip_address_find") as addr_find, \
+                mock.patch("quark.db.api.network_find") as network_find, \
                 mock.patch("quark.db.api.subnet_find_ordered_by_most_full") \
                 as subnet_find, \
                 mock.patch("quark.db.api.subnet_update_next_auto_assign_ip") \
@@ -1245,6 +1250,7 @@ class QuarkNewIPAddressAllocation(QuarkIpamBaseTest):
                 subnet_find.side_effect = sub_mods
 
             subnet_update.return_value = 1
+            network_find.return_value = dict(id=0, ipam_strategy="ANY")
 
             def refresh_mock(sub):
                 sub["next_auto_assign_ip"] += 1
@@ -1514,6 +1520,7 @@ class QuarkIPAddressAllocationTestRetries(QuarkIpamBaseTest):
         self.context.session.add = mock.Mock()
         with mock.patch("quark.db.api.ip_address_find") as addr_find, \
                 mock.patch("quark.db.api.ip_address_create") as addr_create, \
+                mock.patch("quark.db.api.network_find") as network_find, \
                 mock.patch("quark.db.api.subnet_find_ordered_by_most_full") \
                 as subnet_find, \
                 mock.patch("quark.db.api.subnet_update_next_auto_assign_ip") \
@@ -1536,6 +1543,7 @@ class QuarkIPAddressAllocationTestRetries(QuarkIpamBaseTest):
                     sub_mods.append((subnet_helper(sub), count))
             subnet_find.return_value = sub_mods
             subnet_update.return_value = 1
+            network_find.return_value = dict(id=0, ipam_strategy="ANY")
 
             def refresh_mock(sub):
                 sub["next_auto_assign_ip"] += 1
@@ -1657,6 +1665,7 @@ class QuarkIPAddressAllocateDeallocated(QuarkIpamBaseTest):
                 mock.patch("quark.db.api.ip_address_reallocate_find") as \
                 addr_realloc_find, \
                 mock.patch("quark.db.api.ip_address_find") as addr_find, \
+                mock.patch("quark.db.api.network_find") as network_find, \
                 mock.patch("quark.db.api.ip_address_update") as addr_update, \
                 mock.patch("quark.ipam.QuarkIpamANY."
                            "_choose_available_subnet") as choose_subnet:
@@ -1679,6 +1688,7 @@ class QuarkIPAddressAllocateDeallocated(QuarkIpamBaseTest):
                 addr_find.side_effect = addr_mods
                 addr_update.return_value = addr_mod
             choose_subnet.return_value = [subnet_mod]
+            network_find.return_value = dict(id=0, ipam_strategy="ANY")
             if not sub_found:
                 choose_subnet.return_value = []
             yield choose_subnet
@@ -1727,6 +1737,8 @@ class TestQuarkIpPoliciesIpAllocation(QuarkIpamBaseTest):
                 as subnet_update, \
                 mock.patch("quark.db.api.subnet_update_set_full") as \
                 subnet_set_full, \
+                mock.patch("quark.db.api.network_find") as \
+                network_find, \
                 mock.patch("sqlalchemy.orm.session.Session.refresh") as \
                 refresh:
             addr_find.side_effect = [ip_helper(a) for a in addresses]
@@ -1736,6 +1748,7 @@ class TestQuarkIpPoliciesIpAllocation(QuarkIpamBaseTest):
                     sub_mods.append((subnet_helper(sub), count))
             subnet_find.return_value = sub_mods
             subnet_update.return_value = 1
+            network_find.return_value = {"id": 0, "ipam_strategy": "ANY"}
 
             def refresh_mock(sub):
                 sub["next_auto_assign_ip"] += 1
@@ -1834,6 +1847,7 @@ class QuarkIPAddressAllocationNotifications(QuarkIpamBaseTest):
             addresses = [None]
         with mock.patch("quark.db.api.ip_address_find") as addr_find, \
                 mock.patch("quark.db.api.ip_address_create") as addr_create, \
+                mock.patch("quark.db.api.network_find") as network_find, \
                 mock.patch("quark.db.api.subnet_find_ordered_by_most_full") \
                 as subnet_find, \
                 mock.patch("quark.db.api.subnet_update_next_auto_assign_ip") \
@@ -1858,6 +1872,7 @@ class QuarkIPAddressAllocationNotifications(QuarkIpamBaseTest):
             subnet_find.return_value = sub_mods
             subnet_update.return_value = 1
             refresh.return_value = sub_mods
+            network_find.return_value = dict(id=0, ipam_strategy="ANY")
             timeutils.return_value = deleted_at
             yield notify
 
